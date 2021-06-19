@@ -1,0 +1,187 @@
+{
+    "kind": "Template",
+    "apiVersion": "template.openshift.io/v1",
+    "metadata": {
+        "name": "krakenD"
+    },
+    "labels": {
+        "template": "krakenD"
+    },
+    "objects": [
+        {
+            "kind": "Service",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APP_NAME}"
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "name": "web",
+                        "port": 8080,
+                        "targetPort": 8080
+                    }
+                ],
+                "selector": {
+                    "name": "${APP_NAME}"
+                }
+            }
+        },
+        {
+            "kind": "Route",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APP_NAME}"
+            },
+            "spec": {
+                "host": "${APPLICATION_DOMAIN}",
+                "path": "",
+                "to": {
+                    "kind": "Service",
+                    "name": "${APP_NAME}"
+                },
+                "port": {
+                    "targetPort": "web"
+                }
+            }
+        },
+        {
+            "kind": "ImageStream",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APP_NAME}"
+            }
+        },
+        {
+            "kind": "BuildConfig",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APP_NAME}"
+            },
+            "spec": {
+                "source": {
+                    "type": "Git",
+                    "git": {
+                        "uri": "${SOURCE_REPOSITORY_URL}",
+                        "ref": "${SOURCE_REPOSITORY_REF}"
+                    },
+                    "sourceSecret": {
+                        "name": "${SOURCE_SECRET_NAME}"
+                    }
+                },
+                "strategy": {
+                    "type": "Docker"
+                },
+                "output": {
+                    "to": {
+                        "kind": "ImageStreamTag",
+                        "name": "${APP_NAME}:latest"
+                    }
+                },
+                "triggers": [
+                    {
+                        "type": "ConfigChange"
+                    },
+                    {
+                        "type": "GitLab",
+                        "gitlab": {
+                            "secret": "${GITLAB_WEBHOOK_SECRET}"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "kind": "DeploymentConfig",
+            "apiVersion": "v1",
+            "metadata": {
+                "labels": {
+                    "app": "${APP_NAME}",
+                    "app.kubernetes.io/part-of": "KrakenD"
+                },
+                "name": "${APP_NAME}"
+            },
+            "spec": {
+                "strategy": {
+                    "type": "Rolling"
+                },
+                "triggers": [
+                    {
+                        "type": "ImageChange",
+                        "imageChangeParams": {
+                            "automatic": true,
+                            "containerNames": [
+                                "${APP_NAME}"
+                            ],
+                            "from": {
+                                "kind": "ImageStreamTag",
+                                "name": "${APP_NAME}:latest"
+                            }
+                        }
+                    },
+                    {
+                        "type": "ConfigChange"
+                    }
+                ],
+                "replicas": 1,
+                "selector": {
+                    "name": "${APP_NAME}"
+                },
+                "template": {
+                    "metadata": {
+                        "name": "${APP_NAME}",
+                        "labels": {
+                            "name": "${APP_NAME}"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "${APP_NAME}",
+                                "image": "${APP_NAME}",
+                                "env": [
+                                    {
+                                        "name": "DEBUG",
+                                        "value": "${DEBUG}"
+                                    }
+                                ],
+                                "ports": [
+                                    {
+                                        "containerPort": 8080
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    ],
+    "parameters": [
+        {
+            "name": "APP_NAME",
+            "value": "krakenD"
+        },
+        {
+            "name": "APPLICATION_DOMAIN",
+            "value": "krakend.sinesio.com.br"
+        },
+        {
+            "name": "SOURCE_REPOSITORY_URL",
+            "value": "git@github.com:sinesiobittencourt/krakenD_GitHub_OpenShift.git"
+        },
+        {
+            "name": "SOURCE_REPOSITORY_REF",
+            "value": "master"
+        },
+        {
+            "name": "GITLAB_WEBHOOK_SECRET",
+            "generate": "expression",
+            "from": "[a-zA-Z0-9]{40}"
+        },
+        {
+            "name": "SOURCE_SECRET_NAME",
+            "value": "registryrossh"
+        }
+    ]
+}
